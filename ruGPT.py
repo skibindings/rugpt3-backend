@@ -46,65 +46,64 @@ def adjust_length_to_model(length, max_sequence_length):
     return length
 
 def set_seed(args):
-    np.random.seed(args.seed)
-    torch.manual_seed(args.seed)
-    if args.n_gpu > 0:
-        torch.cuda.manual_seed_all(args.seed)
+    np.random.seed(args["seed"])
+    torch.manual_seed(args["seed"])
+    if args["n_gpu"] > 0:
+        torch.cuda.manual_seed_all(args["seed"])
 
 class ruGPTModel:
     # init method or constructor
     def __init__(self):
-        self.parser = argparse.ArgumentParser()
-        self.parser.add_argument("--prompt", type=str, default="")
-        self.parser.add_argument("--length", type=int, default=20)
-        self.parser.add_argument("--stop_token", type=str, default="</s>", help="Token at which text generation is stopped")
+        self.args = {"prompt": "Это тест",
+                     "length": 20,
+                     "stop_token": "</s>",
+                     "temperature": 1.0,
+                     "repetition_penalty": 1.0,
+                     "k": 0,
+                     "p": 0.9,
+                     "seed": 42,
+                     "no_cuda": True,
+                     "num_return_sequences": 1}
 
-        self.parser.add_argument(
-            "--temperature",
-            type=float,
-            default=1.0,
-            help="temperature of 1.0 has no effect, lower tend toward greedy sampling",
-        )
-        self.parser.add_argument(
-            "--repetition_penalty", type=float, default=1.0,
-            help="primarily useful for CTRL model; in that case, use 1.2"
-        )
-        self.parser.add_argument("--k", type=int, default=0)
-        self.parser.add_argument("--p", type=float, default=0.9)
 
-        self.parser.add_argument("--seed", type=int, default=42, help="random seed for initialization")
-        self.parser.add_argument("--no_cuda", action="store_true", help="Avoid using CUDA when available")
-        self.parser.add_argument("--num_return_sequences", type=int, default=1, help="The number of samples to generate.")
-        self.args = self.parser.parse_args()
-
-        self.args.device = torch.device("cuda" if torch.cuda.is_available() and not self.args.no_cuda else "cpu")
-        self.args.n_gpu = 0 if self.args.no_cuda else torch.cuda.device_count()
+        self.args["device"] = torch.device("cuda" if torch.cuda.is_available() and not self.args["no_cuda"] else "cpu")
+        self.args["n_gpu"] = 0 if self.args["no_cuda"] else torch.cuda.device_count()
 
         set_seed(self.args)
 
-        self.tokenizer = GPT2Tokenizer.from_pretrained("rugpt3_model_large/")
-        self.model = GPT2LMHeadModel.from_pretrained("rugpt3_model_large/")
-        self.model.to(self.args.device)
+        self.tokenizer = GPT2Tokenizer.from_pretrained("sberbank-ai/rugpt3large_based_on_gpt2")
+        self.model = GPT2LMHeadModel.from_pretrained("sberbank-ai/rugpt3large_based_on_gpt2")
+        self.model.to(self.args["device"])
 
-        self.args.length = adjust_length_to_model(self.args.length, max_sequence_length=self.model.config.max_position_embeddings)
+        self.args["length"] = adjust_length_to_model(self.args["length"], max_sequence_length=self.model.config.max_position_embeddings)
         logger.info(self.args)
+
+    def set_hyper_params(self, params):
+      self.args["k"]=params["k"]
+      self.args["p"]=params["p"]
+      self.args["temperature"]=params["temperature"]
+      self.args["repetition_penalty"]=params["repetition_penalty"]
+      self.args["length"]=params["length"]
+      self.args["num_return_sequences"]=params["num_return_sequences"]
+      self.args["seed"]=params["seed"]
+      set_seed(self.args)
 
     def inference(self, context):
         generated_sequences = []
         prompt_text = context
 
         encoded_prompt = self.tokenizer.encode(prompt_text, add_special_tokens=False, return_tensors="pt")
-        encoded_prompt = encoded_prompt.to(self.args.device)
+        encoded_prompt = encoded_prompt.to(self.args["device"])
 
         output_sequences = self.model.generate(
             input_ids=encoded_prompt,
-            max_length=self.args.length + len(encoded_prompt[0]),
-            temperature=self.args.temperature,
-            top_k=self.args.k,
-            top_p=self.args.p,
-            repetition_penalty=self.args.repetition_penalty,
+            max_length=self.args["length"] + len(encoded_prompt[0]),
+            temperature=self.args["temperature"],
+            top_k=self.args["k"],
+            top_p=self.args["p"],
+            repetition_penalty=self.args["repetition_penalty"],
             do_sample=True,
-            num_return_sequences=self.args.num_return_sequences,
+            num_return_sequences=self.args["num_return_sequences"],
         )
 
         # Remove the batch dimension when returning multiple sequences
@@ -119,7 +118,7 @@ class ruGPTModel:
             text = self.tokenizer.decode(generated_sequence, clean_up_tokenization_spaces=True)
 
             # Remove all text after the stop token
-            text = text[: text.find(self.args.stop_token) if self.args.stop_token else None]
+            text = text[: text.find(self.args["stop_token"]) if self.args["stop_token"] else None]
 
             # Add the prompt at the beginning of the sequence. Remove the excess text that was used for pre-processing
             total_sequence = (
