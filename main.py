@@ -9,7 +9,7 @@ Send a GET request:
 Send a HEAD request:
     curl -I http://localhost:8000
 Send a POST request:
-    curl -d "foo=bar&bin=baz" http://localhost:8000
+    curl -d "context=Я купил хлеб,&length=30&k=0&p=0.9&temperature=1.0&rp=1.0&nrs=1&seed=42" http://localhost:8000
 """
 import argparse
 from http.server import HTTPServer, BaseHTTPRequestHandler
