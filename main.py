@@ -15,6 +15,9 @@ import argparse
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from ruGPT import ruGPTModel
 
+from cgi import parse_header, parse_multipart
+from urllib.parse import parse_qs
+
 model = ruGPTModel()
 
 class S(BaseHTTPRequestHandler):
@@ -22,6 +25,19 @@ class S(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-type", "text/html")
         self.end_headers()
+
+    def parse_POST(self):
+        ctype, pdict = parse_header(self.headers['content-type'])
+        if ctype == 'multipart/form-data':
+            postvars = parse_multipart(self.rfile, pdict)
+        elif ctype == 'application/x-www-form-urlencoded':
+            length = int(self.headers['content-length'])
+            postvars = parse_qs(
+                self.rfile.read(length).decode('cp1251'),
+                keep_blank_values=1)
+        else:
+            postvars = {}
+        return postvars
 
     def _html(self, message):
         """This just generates an HTML document that includes `message`
@@ -41,11 +57,30 @@ class S(BaseHTTPRequestHandler):
     def do_POST(self):
         # Doesn't do anything with posted data
         self._set_headers()
-        content_len = int(self.headers.get('Content-Length'))
-        post_body = self.rfile.read(content_len)
-        context_str = post_body.decode("utf8")
+        postvars = self.parse_POST()
+
+        context_str = postvars['context'][0]
+        context_b = context_str.encode('utf-8')
+        context_str = context_b.decode('utf-8')
+
+        length = int(postvars['length'][0])
+        k = int(postvars['k'][0])
+        p = float(postvars['p'][0])
+        temperature = float(postvars['temperature'][0])
+        rp = float(postvars['rp'][0])
+        nrs = int(postvars['nrs'][0])
+        seed = int(postvars['seed'][0])
+
+        param ={"length": length,
+                "temperature": temperature,
+                "repetition_penalty": rp,
+                "k": k,
+                "p": p,
+                "seed": seed,
+                "num_return_sequences": nrs}
+        model.set_hyper_params(params=param)
         output_str = model.inference(context=context_str)
-        self.wfile.write(output_str.encode("utf8") )
+        self.wfile.write(output_str.encode('utf-8'))
 
 
 def run(server_class=HTTPServer, handler_class=S, addr="localhost", port=8000):
