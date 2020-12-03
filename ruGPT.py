@@ -71,8 +71,8 @@ class ruGPTModel:
 
         set_seed(self.args)
 
-        self.tokenizer = GPT2Tokenizer.from_pretrained("sberbank-ai/rugpt3large_based_on_gpt2")
-        self.model = GPT2LMHeadModel.from_pretrained("sberbank-ai/rugpt3large_based_on_gpt2")
+        self.tokenizer = GPT2Tokenizer.from_pretrained("rugpt3_model_large/")
+        self.model = GPT2LMHeadModel.from_pretrained("rugpt3_model_large/")
         self.model.to(self.args["device"])
 
         self.args["length"] = adjust_length_to_model(self.args["length"], max_sequence_length=self.model.config.max_position_embeddings)
@@ -129,4 +129,4 @@ class ruGPTModel:
             # os.system('clear')
             print(total_sequence)
         prompt_text = ""
-        return generated_sequences
+        return generated_sequences[0]
